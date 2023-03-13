@@ -126,3 +126,71 @@ def predict_using_trained_model(mod_pkl, xes, yes):
     print(mse)
     r = r2_score(predict_y, yes)
     return mse, r
+
+def main():
+    df = import_data('taxi_jfk_june2020.csv')
+    df = add_tip_time_features(df)
+    print(df[ ['trip_distance','duration','dayofweek','total_amount','percent_tip'] ].head() )
+    print(df[ ['passenger_count','trip_distance'] ].head(10) )
+    df = impute_numeric_cols(df)
+    print( df[ ['passenger_count','trip_distance'] ].head(10) )
+    #Explore some data:
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    sns.set_theme(color_codes=True)
+
+    sns.lmplot(x="total_amount", y="percent_tip", data=df)
+    tot_r = df['total_amount'].corr(df['percent_tip'])
+    plt.title(f'Taxi Trips from JFK, June 2020 with r = {tot_r:.2f}')
+    plt.tight_layout()  #for nicer margins
+    plt.show()
+    sns.lmplot(x="trip_distance", y="percent_tip", data=df)
+    dist_r = df['trip_distance'].corr(df['percent_tip'])
+    plt.title(f'Taxi Trips from JFK, June 2020 with r = {dist_r:.2f}')
+    plt.tight_layout()  #for nicer margins
+    plt.show()
+    df = add_boro(df,'taxi_zones.csv')
+    print('\nThe locations and borough columns:')
+    print(f"{df[['PULocationID','PU_borough','DOLocationID','DO_borough']]}")
+    df_do = encode_categorical_col(df['DO_borough'],'DO_')
+    print(df_do.head())
+    df_all = pd.concat( [df,df_do], axis=1)
+    print(f'The combined DataFrame has columns: {df_all.columns}')
+    df_all = impute_numeric_cols(df_all)
+    num_cols = ['passenger_count','trip_distance','fare_amount',\
+    'tip_amount', 'total_amount', 'percent_tip', 'duration','dayofweek',\
+    'PU_borough', 'DO_borough', 'DO_Bronx', 'DO_Brooklyn','DO_EWR',\
+    'DO_Manhattan', 'DO_Queens']
+    x_train,x_test,y_train,y_test = split_test_train(df_all,num_cols, 'percent_tip')
+    print('For numeric columns, training on 25% of data:')
+    mod_pkl = fit_linear_regression(x_train,y_train)
+    mod = pickle.loads(mod_pkl)
+    print(f'intercept = {mod.intercept_} and coefficients = {mod.coef_}')
+    tr_err,tr_r2 = predict_using_trained_model(mod_pkl, x_train,y_train)
+    print(f'training:  RMSE = {tr_err} and r2 = {tr_r2}.')
+    test_err,test_r2 = predict_using_trained_model(mod_pkl, x_test,y_test)
+    print(f'testing:  RMSE = {test_err} and r2 = {test_r2}.')
+    x_train,x_test,y_train,y_test = split_test_train(df_all,num_cols, 'percent_tip')
+    print('For numeric columns, training on 25% of data:')
+    mod_pkl = fit_linear_regression(x_train,y_train)
+    mod = pickle.loads(mod_pkl)
+    print(f'intercept = {mod.intercept_} and coefficients = {mod.coef_}')
+    tr_err,tr_r2 = predict_using_trained_model(mod_pkl, x_train,y_train)
+    print(f'training:  RMSE = {tr_err} and r2 = {tr_r2}.')
+    test_err,test_r2 = predict_using_trained_model(mod_pkl, x_test,y_test)
+    print(f'testing:  RMSE = {test_err} and r2 = {test_r2}.')
+    print(f'Prediction for 4 July data with only duration and total amount:')
+    df_july = import_data('program06/taxi_4July2020.csv')
+    df_july = add_tip_time_features(df_july)
+    df_july = impute_numeric_cols(df_july)
+    print(df_july[['duration','total_amount']])
+    july_err,july_r2 = predict_using_trained_model(mod2_pkl, df_july[['duration','total_amount']].to_numpy(),df_july['percent_tip'])
+    print(f'RMSE = {july_err} and r2 = {july_r2}.')
+    print(f'Prediction for 4 July data with full model:')
+    df_july = add_boro(df_july,'program06/taxi_zones.csv')
+    df_do_j = encode_categorical_col(df_july['DO_borough'],'DO_')
+    df_all_j = pd.concat( [df_july,df_do_j], axis=1)
+    july_err,july_r2 = predict_using_trained_model(mod_pkl, df_all_j[num_cols].to_numpy(),df_all_j['percent_tip'])
+    print(f'RMSE = {july_err} and r2 = {july_r2}.')
+    
+main()
